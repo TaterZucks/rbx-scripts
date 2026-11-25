@@ -1,10 +1,11 @@
---	Opor nico robin feet script -- WIP
+--	Opor nico robin feet script --
 
 if not game:IsLoaded() then game.Loaded:Wait() end
 
 local PlayerService = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
 
 local client:Player = PlayerService.LocalPlayer
 local client_character:Model = client.Character or client.CharacterAdded:Wait()
@@ -18,9 +19,15 @@ client.CharacterAdded:Connect(function(model)
 	client_rootpart = model:WaitForChild("HumanoidRootPart")
 end)
 
+client.CharacterRemoving:Connect(function()
+	client_character = nil
+	client_humanoid = nil
+	client_rootpart = nil
+end)
+
 local chestfolder = workspace.Chests
 local actors = workspace.Players
-local locations = loadstring(game:HttpGet("https://raw.githubusercontent.com/TaterZucks/opor/refs/heads/main/locationdata.luau"))()
+local locations = loadstring(game:HttpGet("https://raw.githubusercontent.com/TaterZucks/rbx-scripts/refs/heads/main/scripts/one%20piece%20online%20rebirth/locationdata.luau"))()
 
 local whitelisteditems = {
 	"String String", "Dark Dark", "Rubber Rubber", "Shine Shine", "Flame Flame", "Magma Magma", "Thunder Thunder", "Quake Quake", "Venom Venom", "Buddha Buddha", "Magnet Magnet", "Operation Operation", "Phoenix Phoenix", "Leopard Leopard", "Combat", "Den Den Mushi", "CookBook",
@@ -40,16 +47,28 @@ if workspace:FindFirstChild("OutfitShop") then
 	sea = "Grand Line"
 end
 
+--[[
+local httpService = game:GetService("HttpService")
+
+httpService:PostAsync("https://webhook.lewisakura.moe/api/webhooks/{WEBHOOK_ID}/{WEBHOOK_TOKEN}",
+	httpService:JSONEncode({
+		content = "Hello, world!"
+	})
+)
+]]
+
+
+
+
 -- Initialize --
 
-local ver = "1.1 (Rework)"
-local Iris = loadstring(game:HttpGet("https://raw.githubusercontent.com/Bac0nHck/iris/refs/heads/main/Iris.luau"))()
+local ver = "1.2.0-Rework"
+local Iris = loadstring(game:HttpGet("https://raw.githubusercontent.com/TaterZucks/rbx-scripts/refs/heads/main/libs/iris.luau"))()
 local autoFarm = Iris.State(false)
 local auto_Farm_Fruits = Iris.State(false)
 local auto_Farm_Chests = Iris.State(false)
 local auto_Farm_Npcs = Iris.State(false)
 local auto_Farm_Quests = Iris.State(false)
-local auto_Farm_ResetForKeys = Iris.State(false)
 local auto_Farm_IgnoreFruitWhitelist = Iris.State(false)
 local auto_Farm_IgnoreChestWhitelist = Iris.State(false)
 local auto_Farm_PauseOnAdmin = Iris.State(true)
@@ -79,6 +98,20 @@ local eneldemonslider = Iris.State(0.5)
 local auto_Dodge_Macro_Selection = Iris.State(nil)
 local auto_Dodge_Macro_Enabled = Iris.State(false)
 
+local webhook_Enabled = Iris.State(true)
+local webhook_Id = Iris.State("")
+local webhook_Token = Iris.State("")
+
+local function sendWebhook(message)
+	if not webhook_Enabled.value then return end
+	if webhook_Id.value == "" or webhook_Token.value == "" then return end
+	local webhook = "https://discord.com/api/webhooks/" .. webhook_Id.value .. "/" .. webhook_Token.value
+	game:HttpPost(webhook,
+		HttpService:JSONEncode({
+			content = message
+		})
+	)
+end
 
 local widgets = {}
 local windowSize = Iris.State(Vector2.new(400, 400))
@@ -90,13 +123,11 @@ local hui = gethui()
 local nrfmfolder = hui:FindFirstChild("Nrfm")
 if nrfmfolder then
 	nrfmfolder:Destroy()
-	print("destroyed")
 end
 
 nrfmfolder = Instance.new("Folder")
 nrfmfolder.Name = "Nrfm"
 nrfmfolder.Parent = hui
-print(nrfmfolder.Parent.Name)
 
 local function startTab(id, title)
 	local tab = Iris.Tab({title})
@@ -141,7 +172,7 @@ end
 
 client.OnTeleport:Connect(function()
 	if keepNrfmOnTeleport.value == true then
-		queue_on_teleport("loadstring(game:HttpGet('https://raw.githubusercontent.com/TaterZucks/opor/refs/heads/main/src.luau'))()")
+		queue_on_teleport("loadstring(game:HttpGet('https://github.com/TaterZucks/rbx-scripts/blob/main/scripts/one%20piece%20online%20rebirth/source.luau'))()")
 	end
 end)
 
@@ -227,9 +258,16 @@ local function updateFruitList()
 
 				if v.Name ~= fruit and fruit ~= nil then
 					v.Name = fruit
-
-					local nearestisland = getNearestIslandToPosition(v:GetPivot().Position)
-					notifications:Notify("Found " .. fruit .. " at " .. nearestisland .. "!");
+					
+					if table.find(whitelisteditems, fruit) then
+						local nearestisland = getNearestIslandToPosition(v:GetPivot().Position)
+						if webhook_Enabled.value then
+							local server = client.PlayerGui.ServerList.ServerName.ServerName.Text
+							local fruitdisplay = string.split(fruit, " ")[1]
+							sendWebhook("Found **" .. fruitdisplay .. "** at **" .. nearestisland .. "** in server **" .. server .. "**!")
+						end
+						notifications:Notify("Found " .. fruit .. " at " .. nearestisland .. "!");
+					end
 				end
 
 				table.insert(fruits, v)
@@ -237,16 +275,6 @@ local function updateFruitList()
 			end 
 		end
 	end
-end
-
-local function getClientsKeys()
-	local keys = {}
-	for _, key in pairs(client.Backpack:GetChildren()) do
-		if key.Name == "Key" then
-			table.insert(keys, key)
-		end
-	end
-	return keys
 end
 
 local function autoEatApple()
@@ -283,7 +311,7 @@ local function autoEatApple()
 					local args = {
 						"Eat"
 					}
-					game:GetService("Players").LocalPlayer.Character:WaitForChild("Apple"):WaitForChild("EatFoodItem"):FireServer(unpack(args))
+					client_character:WaitForChild("Apple"):WaitForChild("EatFoodItem"):FireServer(unpack(args))
 					task.wait(1.5)	
 				end
 
@@ -315,9 +343,6 @@ end
 
 local function updateChestList()
 	table.clear(chests)
-	if #getClientsKeys() > 0 then
-		table.insert(chestwhitelist, "Chest_Golden_Locked")
-	end
 	for _,v in pairs(chestfolder:GetChildren()) do
 		if auto_Farm_IgnoreChestWhitelist.value == false then
 			if table.find(chestwhitelist, v.Name) then
@@ -367,23 +392,7 @@ local function farmChests()
 					while not clickcd and active == true do
 						task.wait(0.05)
 						teleportClient(pos)
-						
-						if chest:FindFirstChild("Locked") then
-							local keys = getClientsKeys()
-							if #keys > 0 then
-								local key = keys[1]
-								local function unlock()
-									client_humanoid:EquipTool(key)
-									fireclickdetector(clickdetector)
-									print("opened")
-								end
-								unlock()
-								task.wait(0.1)
-								fireclickdetector(clickdetector)
-							end
-						else
-							fireclickdetector(clickdetector)
-						end
+						fireclickdetector(clickdetector)
 						
 						clickcd = chest:FindFirstChild("ClickCD")
 						active = chest:FindFirstChild("Active").value
@@ -504,62 +513,6 @@ end
 
 local function clickUIButton(button:TextButton)
 	firesignal(button.MouseButton1Click)
-end
-
-local function buyKeys(amount:number)
-	
-	local disco = workspace.NPCs:FindFirstChild("Disco")
-	local pos = CFrame.new(disco:GetPivot().Position)
-	teleportClient(pos)
-	task.wait(ping)
-	
-	local shop = nil
-	
-	local function openShop()
-		local torso = disco:FindFirstChild("Torso")
-		local prox = torso:FindFirstChild("ProximityPrompt")
-		local button, dialogue = nil, nil
-		while not shop do
-			task.wait(0.01)
-			
-			if dialogue then
-				button = dialogue.Background.DialogueOptionButton_Left
-			else
-				fireproximityprompt(prox)
-				dialogue = game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("DiscoDialogue")
-			end
-			if button then
-				clickUIButton(button)
-				shop = game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("Shop_Customizable")
-			end
-		end
-	end
-	
-	local function buy()
-		local keyButton = nil
-		while not keyButton do
-			task.wait(0.01)
-			keyButton = shop.Scroll.ScrollingFrame:FindFirstChild("Key"):FindFirstChild("ClickButton")
-		end
-		print("found it")
-		local objectName = shop.Main.ObjectName
-		local buyButton = shop.Main.PURCHASE
-		while objectName.Text ~= "Key" do
-			task.wait(0.01)
-			clickUIButton(keyButton)
-			print("abc")
-		end
-		print("buy")
-		for i = 1, amount do
-			print("buying " .. i)
-			task.wait(2)
-			clickUIButton(buyButton)
-		end
-		
-	end
-	
-	openShop()
-	buy()
 end
 
 local function crashServer()
@@ -774,7 +727,7 @@ local eneldemonFunctions = {
 		spawnEnelDemon(pos, 1, eneldemonslider.value)
 	end,
 	
-	["epoic"] = function()
+	["chunks"] = function()
 		local range = eneldemonslider.value
 		local size = 16
 		local startpos = CFrame.new(getClientPosition())
@@ -841,7 +794,17 @@ local function loadmap()
 	teleportClient(origin)
 end
 
+local function sortedKeys(tableToSort)
+	local keys = {}
+	for key in pairs(tableToSort) do
+		table.insert(keys, key)
+	end
+	table.sort(keys)
+	return keys
+end
+
 local mainLoop = true
+local sortedlocations = sortedKeys(locations[sea])
 Iris:Connect(function()
 	ping = client:GetNetworkPing()
 	Iris.Window({"NRFM By Drippleton " .. ver}, {size = windowSize})
@@ -886,9 +849,9 @@ Iris:Connect(function()
 			Iris.SeparatorText({"Teleporting"})
 			Iris.Tree({ "Locations" })
 			do
-				for key, location in pairs(locations[sea]) do
+				for _, key in pairs(sortedlocations) do
 					if Iris.Button({key}).clicked() then
-						teleportClient(CFrame.new(location))
+						teleportClient(CFrame.new(locations[sea][key]))
 					end
 				end
 			end
@@ -921,9 +884,12 @@ Iris:Connect(function()
 		Iris.End()
 		
 		if startTab("farming", "Farming") then
+			
+			Iris.Text({"Auto Farm | Fruits: "..#fruits .. " | Whitelisted Chests: "..#chests})
+			Iris.Separator()
+			
 			Iris.SeparatorText({"Toggles"})
 			
-			Iris.Text({"Auto Farm"})
 			Iris.SameLine()
 			do
 				Iris.Checkbox({"Enabled"}, {isChecked = autoFarm})
@@ -949,7 +915,6 @@ Iris:Connect(function()
 			end
 			Iris.End()
 			
-			Iris.Checkbox({"Reset for keys"}, {isChecked = auto_Farm_ResetForKeys})
 			Iris.SliderNum({"Stealth range", 1, 0, 500}, {number = stealth_Minimum_Range})
 			
 			local whitelistedfruits = {}
@@ -974,15 +939,45 @@ Iris:Connect(function()
 			Iris.Tree({ "All" })
 			renderFruitButtons(otherfruits)
 			Iris.End()
-			
-			Iris.SeparatorText({"Info"})
-			Iris.Text({"Auto Farm"})
-			Iris.ProgressBar({"Progress"}, {progress = progress})
 
 			Iris.Separator() 
-			Iris.Text({"Data"})
-			Iris.Text({"Fruits: "..#fruits})
-			Iris.Text({"Chests: "..#chests})
+			
+			Iris.CollapsingHeader({ "Whitelist Control" })
+			do
+
+				local whitelistinput = Iris.InputText({"Whitelist", "Input a item name here"})
+				Iris.SameLine()
+				do
+					if Iris.Button({" Add "}).clicked() then
+						table.insert(whitelisteditems, whitelistinput.text.value)
+					end
+
+					if Iris.Button({" Remove "}).clicked() then
+						table.remove(whitelisteditems, table.find(whitelisteditems, whitelistinput.text.value))
+					end
+
+					if Iris.Button({" Clear "}).clicked() then
+						table.clear(whitelisteditems)
+					end
+
+				end
+				Iris.End()
+
+				if Iris.Button({" Drop unwhitelisted "}).clicked() then
+					coroutine.wrap(dropUnwantedTools)()
+				end
+
+				Iris.Tree({ "Whitelisted Items" })
+
+				for _,v in pairs(whitelisteditems) do
+					Iris.Text({ v })
+				end
+
+				Iris.End()
+			end
+			Iris.End()
+			
+			Iris.Separator()
 			
 			Iris.SeparatorText({"Haki Farming"})
 			Iris.Checkbox({"Dodge macro"}, {isChecked = auto_Dodge_Macro_Enabled})
@@ -1012,22 +1007,21 @@ Iris:Connect(function()
 			Iris.ComboArray({"Selected Player"}, {index = selectedPlayer}, getAllPlayerNames())
 			local plr = game.Players:FindFirstChild(selectedPlayer.value)
 			if plr and plr.Character then
-				local root = getRootOfActor(actors:FindFirstChild(plr.Name))
+				local pos = plr.Character:GetPivot().Position
 				local nearestlocation, distance = "Unknown", "Unknown"
-				if root then
-					nearestlocation = getNearestIslandToPosition( root.Position )
-					distance = getDistance(root.Position, getClientPosition())
+				if pos then
+					nearestlocation = getNearestIslandToPosition(pos)
+					distance = math.round(getDistance(pos, getClientPosition()))
 				end
-				Iris.Text({"Location: "..nearestlocation.. " | Distance: ".. math.round(distance)})
+				Iris.Text({"Location: "..nearestlocation.. " | Distance: ".. distance})
 				
 				Iris.SeparatorText({"Functions"})
 
 				Iris.SameLine()
 				do
 					if Iris.Button({"Teleport"}).clicked() then
-						if root then
-							local cf = root.CFrame
-							teleportClient(cf)
+						if pos then
+							teleportClient(CFrame.new(pos))
 						end
 					end
 					
@@ -1123,36 +1117,18 @@ Iris:Connect(function()
 		Iris.End()
 		
 		if startTab("trolling", "Trolling") then
-			Iris.SeparatorText({"Epic"})
+			
+			Iris.SeparatorText({"Crashing"})
 			local eneldemonsettings = {}
 			for key, _ in pairs(eneldemonFunctions) do
 				table.insert(eneldemonsettings, key)
 			end
-			Iris.ComboArray({"Selected Player"}, {index = eneldemonsetting}, eneldemonsettings)
-			Iris.SliderNum({"Slider", 1, 0.5, 1000}, {number = eneldemonslider})
-			Iris.SeparatorText({"Crashing"})
 			
-		end
-		Iris.End()
-		
-		if startTab("settings", "Settings") then
-			Iris.SeparatorText({"Preferences"})
-		end
-		Iris.End()
-	end
-	Iris.End()
-
-	Iris.End()
-	
-	-- Main loop
-	if mainLoop == true then
-		mainLoop = false
-		
-		local mainLoopThread = task.spawn(function()
-			-- Misc
+			Iris.Text({"Requires Thunder Thunder fruit or sulong"})
+			Iris.ComboArray({"Mode"}, {index = eneldemonsetting}, eneldemonsettings)
+			Iris.SliderNum({"Spawn Amount", 1, 0.5, 1000}, {number = eneldemonslider})
 			
-			eneldemonFunctions[eneldemonsetting.value]()
-			if eneldemonsetting.value ~= "none" then
+			if Iris.Button({"Anti crash"}).clicked() then
 				local del = workspace:FindFirstChild("TargetFilter")
 				local del3 = client.PlayerScripts:FindFirstChild("SecondaryClientEffects")
 				if client_character then
@@ -1168,6 +1144,33 @@ Iris:Connect(function()
 					del3:Destroy()
 				end
 			end
+			
+			Iris.Separator()
+		end
+		Iris.End()
+		
+		if startTab("webhook", "Webhook") then
+			Iris.SeparatorText({"Webhook"})
+			Iris.InputText({"Webhook ID"}, {text = webhook_Id})
+			Iris.InputText({"Webhook Token"}, {text = webhook_Token})
+			Iris.SeparatorText({"Options"})
+			Iris.Checkbox({"Whitelisted Fruits"}, { isChecked = webhook_Enabled })
+		end
+		Iris.End()
+		
+	end
+	Iris.End()
+
+	Iris.End()
+	
+	-- Main loop
+	if mainLoop == true then
+		mainLoop = false
+		
+		local mainLoopThread = task.spawn(function()
+			-- Misc
+			
+			eneldemonFunctions[eneldemonsetting.value]()
 			
 			if autoEat.value == true then
 				autoEatApple()
@@ -1206,7 +1209,7 @@ Iris:Connect(function()
 				if auto_Farm_Fruits.value then
 					farmFruits()
 				end
-				teleportClient(CFrame.new(origin))
+				telepeortClient(CFrame.new(origin))
 			end
 			
 			if auto_Farm_Npcs.value then				
@@ -1225,7 +1228,7 @@ Iris:Connect(function()
 			
 			if admin then
 				mainLoop = false
-				while PlayerService:FindFirstChild(admin) do
+				while PlayerService:FindFirstChild(admin.Name) do
 					task.wait(1)
 				end
 				notifications:Notify("Admin left, resuming cheats") 
